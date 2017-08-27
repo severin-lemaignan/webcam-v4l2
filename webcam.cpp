@@ -144,13 +144,7 @@ const RGBImage& Webcam::frame(int timeout)
         if (0 == r) {
             throw runtime_error(device + ": select timeout");
         }
-        int idx = read_frame();
-        if (idx != -1) {
-            v4lconvert_yuyv_to_rgb24((unsigned char *) buffers[idx].data,
-                                     rgb_frame.data,
-                                     xres,
-                                     yres,
-                                     stride);
+        if (read_frame()) {
             return rgb_frame;
         }
         /* EAGAIN - continue select loop. */
@@ -172,7 +166,7 @@ bool Webcam::read_frame()
     if (-1 == xioctl(fd, VIDIOC_DQBUF, &buf)) {
         switch (errno) {
             case EAGAIN:
-                return -1;
+                return false;
 
             case EIO:
                 /* Could ignore EIO, see spec. */
@@ -186,12 +180,16 @@ bool Webcam::read_frame()
 
     assert(buf.index < n_buffers);
 
-    //process_image(buffers[buf.index].data, buf.bytesused);
+    v4lconvert_yuyv_to_rgb24((unsigned char *) buffers[buf.index].data,
+                             rgb_frame.data,
+                             xres,
+                             yres,
+                             stride);
 
     if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
         throw runtime_error("VIDIOC_QBUF");
 
-    return buf.index;
+    return true;
 }
 
 void Webcam::open_device(void)
